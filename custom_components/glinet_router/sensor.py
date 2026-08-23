@@ -97,15 +97,16 @@ SENSORS: tuple[GLiNetSensorDescription, ...] = (
             icon="mdi:memory" if key.startswith("memory") else "mdi:harddisk",
             device_class=SensorDeviceClass.DATA_SIZE,
             native_unit_of_measurement=UnitOfInformation.BYTES,
+            suggested_unit_of_measurement=suggested_unit,
             state_class=SensorStateClass.MEASUREMENT,
             entity_category=EntityCategory.DIAGNOSTIC,
             value_fn=_value(key),
         )
-        for key, name in (
-            ("memory_free", "Memory free"),
-            ("memory_total", "Memory total"),
-            ("flash_free", "Flash free"),
-            ("flash_total", "Flash total"),
+        for key, name, suggested_unit in (
+            ("memory_free", "Memory free", UnitOfInformation.MEGABYTES),
+            ("memory_total", "Memory total", UnitOfInformation.MEGABYTES),
+            ("flash_free", "Flash free", UnitOfInformation.GIGABYTES),
+            ("flash_total", "Flash total", UnitOfInformation.GIGABYTES),
         )
     ),
     GLiNetSensorDescription(
@@ -145,6 +146,8 @@ SENSORS: tuple[GLiNetSensorDescription, ...] = (
             icon="mdi:signal",
             native_unit_of_measurement=unit,
             state_class=SensorStateClass.MEASUREMENT,
+            entity_category=EntityCategory.DIAGNOSTIC,
+            entity_registry_enabled_default=False,
             value_fn=_value(key),
         )
         for key, name, unit in (
@@ -160,6 +163,7 @@ SENSORS: tuple[GLiNetSensorDescription, ...] = (
         icon="mdi:counter",
         device_class=SensorDeviceClass.DATA_SIZE,
         native_unit_of_measurement=UnitOfInformation.BYTES,
+        suggested_unit_of_measurement=UnitOfInformation.GIGABYTES,
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=_value("cellular_traffic_total"),
     ),

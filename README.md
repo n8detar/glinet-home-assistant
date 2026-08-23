@@ -71,7 +71,7 @@ Entities are created only when their normalized source value or capability is pr
 - Uptime
 - CPU temperature
 - 1-, 5-, and 15-minute load averages
-- Memory and flash utilization
+- Memory and flash utilization, with MB defaults for memory size and GB defaults for flash size
 - Router mode
 - Time synchronization, IPv6, QoS, SQM, LED, and USB 3 states when available
 - Fan speed and running state
@@ -90,8 +90,8 @@ Entities are created only when their normalized source value or capability is pr
 - Active SIM slot, without SIM identifiers
 - Operator and network type
 - LTE/NR bands and downlink bandwidth
-- RSRP, RSRQ, SINR, and RSSI
-- Cellular traffic total
+- RSRP, RSRQ, SINR, and RSSI as disabled-by-default diagnostic sensors
+- Cellular traffic total, displayed in GB by default
 - Unread SMS count
 - Modem model and bus diagnostic values
 

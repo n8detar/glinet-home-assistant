@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          python-version: "3.13"
+      - name: Ruff
+        run: |
+          uv run --with ruff ruff check .
+          uv run --with ruff ruff format --check .
+      - name: Tests
+        run: uv run --with pytest-homeassistant-custom-component --with passlib pytest -q
+      - name: Compile
+        run: python -m compileall -q custom_components
