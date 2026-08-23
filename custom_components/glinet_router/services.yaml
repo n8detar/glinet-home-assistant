@@ -1,0 +1,24 @@
+send_sms:
+  name: Send SMS
+  description: Send an SMS through a supported GL.iNet cellular modem. The number and message are not logged or retained.
+  fields:
+    config_entry_id:
+      name: Router
+      description: Required only when more than one GL.iNet router is loaded.
+      selector:
+        config_entry:
+          integration: glinet_router
+    phone_number:
+      name: Phone number
+      description: Destination phone number.
+      required: true
+      example: "+15551234567"
+      selector:
+        text:
+    message:
+      name: Message
+      description: SMS body.
+      required: true
+      selector:
+        text:
+          multiline: true

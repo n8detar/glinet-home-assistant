@@ -1,0 +1,51 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This router is already configured."
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the router.",
+      "invalid_auth": "Authentication failed.",
+      "unknown": "Unexpected error."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "host": "Host or IP address",
+          "password": "Admin password",
+          "use_ssl": "Use HTTPS",
+          "username": "Username",
+          "verify_ssl": "Verify TLS certificate"
+        },
+        "description": "Connect directly to the GL.iNet firmware 4.x JSON-RPC API. Credentials stay in Home Assistant config-entry storage.",
+        "title": "Add GL.iNet router"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  },
+  "services": {
+    "send_sms": {
+      "description": "Send an SMS through a supported cellular modem. Phone numbers and message bodies are not logged or retained.",
+      "fields": {
+        "message": {
+          "description": "SMS body",
+          "name": "Message"
+        },
+        "phone_number": {
+          "description": "Destination number",
+          "name": "Phone number"
+        }
+      },
+      "name": "Send SMS"
+    }
+  },
+  "title": "GL.iNet Router"
+}
