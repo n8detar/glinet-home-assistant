@@ -1,12 +1,12 @@
 {
   "domain": "glinet_router",
   "name": "GL.iNet Router",
-  "codeowners": ["@ndetar"],
+  "codeowners": ["@n8detar"],
   "config_flow": true,
-  "documentation": "https://github.com/ndetar/glinet-home-assistant",
+  "documentation": "https://github.com/n8detar/glinet-home-assistant",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/ndetar/glinet-home-assistant/issues",
+  "issue_tracker": "https://github.com/n8detar/glinet-home-assistant/issues",
   "requirements": ["passlib==1.7.4"],
   "version": "0.1.0"
 }

@@ -29,11 +29,9 @@ Authentication is based on the algorithm advertised by the router challenge. The
 
 ### HACS custom repository
 
-After this project is published to GitHub:
-
 1. Open HACS.
 2. Open the three-dot menu and choose **Custom repositories**.
-3. Add the GitHub repository URL as an **Integration**.
+3. Add `https://github.com/n8detar/glinet-home-assistant` as an **Integration**.
 4. Install **GL.iNet Router**.
 5. Restart Home Assistant.
 
