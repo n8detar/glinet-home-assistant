@@ -173,9 +173,35 @@ async def test_get_snapshot_discovers_modem_bus_and_sanitizes(
     snapshot = await client.async_get_snapshot()
 
     assert ("modem", "get_cells_info", {"bus": "0001:01:00.0"}) in calls
+    assert ("clients", "get_list", {}) in calls
     assert snapshot.device["modem"] == "RM520N-GL"
     assert "private-imei" not in repr(snapshot)
     assert "private-cell" not in repr(snapshot)
+
+
+@pytest.mark.asyncio
+async def test_get_snapshot_skips_client_inventory_when_tracking_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=FakeSession([]),
+    )
+    calls: list[tuple[str, str]] = []
+
+    async def fake_call(
+        service: str, method: str, params: dict[str, Any] | None = None, **_: Any
+    ) -> dict[str, Any]:
+        calls.append((service, method))
+        return {}
+
+    monkeypatch.setattr(client, "async_call", fake_call)
+
+    await client.async_get_snapshot(include_clients=False)
+
+    assert ("clients", "get_list") not in calls
 
 
 @pytest.mark.asyncio

@@ -18,12 +18,18 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import GLiNetApiClient, GLiNetAuthenticationError, GLiNetError
 from .const import (
+    CONF_DETECTION_TIME,
+    CONF_IGNORE_LOCAL_MAC,
     CONF_SCAN_INTERVAL,
+    CONF_TRACK_CLIENTS,
+    CONF_TRACK_WIRED_CLIENTS,
     CONF_USE_SSL,
+    DEFAULT_DETECTION_TIME,
     DEFAULT_HOST,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_USERNAME,
     DOMAIN,
+    MIN_DETECTION_TIME,
     MIN_SCAN_INTERVAL,
 )
 from .util import build_endpoint, router_unique_id
@@ -112,7 +118,29 @@ class GLiNetOptionsFlow(OptionsFlow):
                     default=self.config_entry.options.get(
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
-                ): vol.All(cv.positive_int, vol.Range(min=MIN_SCAN_INTERVAL, max=3600))
+                ): vol.All(cv.positive_int, vol.Range(min=MIN_SCAN_INTERVAL, max=3600)),
+                vol.Required(
+                    CONF_TRACK_CLIENTS,
+                    default=self.config_entry.options.get(CONF_TRACK_CLIENTS, True),
+                ): cv.boolean,
+                vol.Required(
+                    CONF_TRACK_WIRED_CLIENTS,
+                    default=self.config_entry.options.get(
+                        CONF_TRACK_WIRED_CLIENTS, True
+                    ),
+                ): cv.boolean,
+                vol.Required(
+                    CONF_IGNORE_LOCAL_MAC,
+                    default=self.config_entry.options.get(CONF_IGNORE_LOCAL_MAC, False),
+                ): cv.boolean,
+                vol.Required(
+                    CONF_DETECTION_TIME,
+                    default=self.config_entry.options.get(
+                        CONF_DETECTION_TIME, DEFAULT_DETECTION_TIME
+                    ),
+                ): vol.All(
+                    cv.positive_int, vol.Range(min=MIN_DETECTION_TIME, max=3600)
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

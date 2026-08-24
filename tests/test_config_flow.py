@@ -8,7 +8,15 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VE
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.glinet_router.const import CONF_USE_SSL, DOMAIN
+from custom_components.glinet_router.const import (
+    CONF_DETECTION_TIME,
+    CONF_IGNORE_LOCAL_MAC,
+    CONF_SCAN_INTERVAL,
+    CONF_TRACK_CLIENTS,
+    CONF_TRACK_WIRED_CLIENTS,
+    CONF_USE_SSL,
+    DOMAIN,
+)
 
 pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
@@ -77,3 +85,29 @@ async def test_duplicate_router_is_rejected(
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_options_flow_saves_unifi_style_client_tracking_options(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="hashed-router-id",
+        data={},
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+
+    options = {
+        CONF_SCAN_INTERVAL: 30,
+        CONF_TRACK_CLIENTS: True,
+        CONF_TRACK_WIRED_CLIENTS: True,
+        CONF_IGNORE_LOCAL_MAC: False,
+        CONF_DETECTION_TIME: 300,
+    }
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input=options
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == options

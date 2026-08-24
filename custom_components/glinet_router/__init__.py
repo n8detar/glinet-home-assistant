@@ -33,6 +33,7 @@ from .util import build_endpoint
 PLATFORMS: tuple[Platform, ...] = (
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+    Platform.DEVICE_TRACKER,
     Platform.SELECT,
     Platform.SWITCH,
     Platform.BUTTON,
