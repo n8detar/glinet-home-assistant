@@ -203,7 +203,9 @@ class GLiNetApiClient:
                 raise
             return {}
 
-    async def async_get_snapshot(self) -> RouterSnapshot:
+    async def async_get_snapshot(
+        self, *, include_clients: bool = True
+    ) -> RouterSnapshot:
         """Fetch passive endpoints and immediately discard raw private fields."""
         core_specs = (
             ("system_info", "system", "get_info"),
@@ -227,6 +229,8 @@ class GLiNetApiClient:
             ("zerotier_config", "zerotier", "get_config"),
             ("zerotier_status", "zerotier", "get_status"),
         )
+        if include_clients:
+            optional_specs += (("clients", "clients", "get_list"),)
         core_results = await asyncio.gather(
             *(self.async_call(service, method) for _, service, method in core_specs)
         )

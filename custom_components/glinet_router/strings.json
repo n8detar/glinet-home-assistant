@@ -26,7 +26,17 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Polling interval (seconds)"
+          "scan_interval": "Polling interval (seconds)",
+          "track_clients": "Track connected clients",
+          "track_wired_clients": "Track wired clients",
+          "ignore_local_mac": "Ignore randomized/local MAC addresses",
+          "detection_time": "Client detection time (seconds)"
+        },
+        "data_description": {
+          "track_clients": "Create default-enabled device tracker entities for clients reported by the router.",
+          "track_wired_clients": "Include clients connected through Ethernet.",
+          "ignore_local_mac": "Skip wireless clients using locally administered MAC addresses.",
+          "detection_time": "Keep a recently connected client home for this grace period when it disappears or reports offline."
         }
       }
     }

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
 PRIORITY_ETHERNET_FIRST: Final = "Ethernet before cellular"
@@ -38,6 +39,62 @@ class RouterSnapshot:
     binary: dict[str, bool | None] = field(default_factory=dict)
     device: dict[str, str] = field(default_factory=dict)
     capabilities: set[str] = field(default_factory=set)
+    clients: dict[str, RouterClient] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class RouterClient:
+    """Normalized client identity and current router-presence state."""
+
+    mac: str
+    name: str | None
+    ip_address: str | None
+    connected: bool
+    interface: str | None
+    blocked: bool
+    remote: bool
+
+
+@dataclass(slots=True)
+class ClientPresenceStore:
+    """Keep discovered clients and apply a UniFi-style stale grace period."""
+
+    detection_time: int
+    include_wired: bool = True
+    ignore_local_mac: bool = False
+    _clients: dict[str, RouterClient] = field(default_factory=dict, init=False)
+    _last_seen: dict[str, float] = field(default_factory=dict, init=False)
+
+    def _allowed(self, client: RouterClient) -> bool:
+        if client.interface == "cable" and not self.include_wired:
+            return False
+        return not (
+            self.ignore_local_mac
+            and client.interface != "cable"
+            and _is_locally_administered_mac(client.mac)
+        )
+
+    def update(
+        self, clients: dict[str, RouterClient], *, now: float
+    ) -> dict[str, RouterClient]:
+        """Merge one successful poll and return remembered presence records."""
+        for mac, client in clients.items():
+            if not self._allowed(client):
+                continue
+            if client.connected:
+                self._last_seen[mac] = now
+            self._clients[mac] = client
+
+        return {
+            mac: replace(
+                client,
+                connected=(
+                    mac in self._last_seen
+                    and now - self._last_seen[mac] <= self.detection_time
+                ),
+            )
+            for mac, client in self._clients.items()
+        }
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -46,6 +103,27 @@ def _dict(value: Any) -> dict[str, Any]:
 
 def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _normalize_mac(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    compact = re.sub(r"[:-]", "", value.strip())
+    if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact):
+        return None
+    compact = compact.upper()
+    return ":".join(compact[index : index + 2] for index in range(0, 12, 2))
+
+
+def _is_locally_administered_mac(mac: str) -> bool:
+    return bool(int(mac[:2], 16) & 0x02)
+
+
+def _optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
 
 
 def _number(value: Any) -> int | float | None:
@@ -342,22 +420,40 @@ def build_snapshot(responses: dict[str, Any]) -> RouterSnapshot:
     values["firewall_rules"] = len(firewall_rules)
     values["port_forwards"] = len(port_forwards)
 
-    raw_clients = _list(_dict(responses.get("clients")).get("clients"))
-    if raw_clients:
+    clients_response = _dict(responses.get("clients"))
+    raw_clients_value = clients_response.get("clients")
+    if isinstance(raw_clients_value, list):
+        snapshot.capabilities.add("clients")
+        for raw_client in raw_clients_value:
+            client = _dict(raw_client)
+            mac = _normalize_mac(client.get("mac"))
+            if mac is None:
+                continue
+            normalized = RouterClient(
+                mac=mac,
+                name=_optional_string(client.get("name")),
+                ip_address=_optional_string(client.get("ip")),
+                connected=client.get("online") is True,
+                interface=_optional_string(client.get("iface")),
+                blocked=client.get("blocked") is True,
+                remote=client.get("remote") is True,
+            )
+            existing = snapshot.clients.get(mac)
+            if existing is None or normalized.connected or not existing.connected:
+                snapshot.clients[mac] = normalized
+
         online_clients = [
-            client
-            for client in raw_clients
-            if isinstance(client, dict) and client.get("online")
+            client for client in snapshot.clients.values() if client.connected
         ]
         values["online_clients"] = len(online_clients)
         values["online_2g_clients"] = sum(
-            _dict(client).get("iface") == "2.4G" for client in online_clients
+            client.interface == "2.4G" for client in online_clients
         )
         values["online_5g_clients"] = sum(
-            _dict(client).get("iface") == "5G" for client in online_clients
+            client.interface == "5G" for client in online_clients
         )
         values["online_wired_clients"] = sum(
-            _dict(client).get("iface") == "cable" for client in online_clients
+            client.interface == "cable" for client in online_clients
         )
 
     ddns_config = _dict(responses.get("ddns_config"))

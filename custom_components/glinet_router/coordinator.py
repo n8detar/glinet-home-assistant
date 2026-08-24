@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from time import monotonic
 
 from aiohttp import ClientError
 from homeassistant.config_entries import ConfigEntry
@@ -12,8 +13,17 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import GLiNetApiClient, GLiNetAuthenticationError, GLiNetError
-from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
-from .models import RouterSnapshot
+from .const import (
+    CONF_DETECTION_TIME,
+    CONF_IGNORE_LOCAL_MAC,
+    CONF_SCAN_INTERVAL,
+    CONF_TRACK_CLIENTS,
+    CONF_TRACK_WIRED_CLIENTS,
+    DEFAULT_DETECTION_TIME,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
+from .models import ClientPresenceStore, RouterSnapshot
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +39,14 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
     ) -> None:
         self.entry = entry
         self.client = client
+        self.track_clients = bool(entry.options.get(CONF_TRACK_CLIENTS, True))
+        self._client_presence = ClientPresenceStore(
+            detection_time=int(
+                entry.options.get(CONF_DETECTION_TIME, DEFAULT_DETECTION_TIME)
+            ),
+            include_wired=bool(entry.options.get(CONF_TRACK_WIRED_CLIENTS, True)),
+            ignore_local_mac=bool(entry.options.get(CONF_IGNORE_LOCAL_MAC, False)),
+        )
         scan_interval = int(
             entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         )
@@ -42,7 +60,14 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
 
     async def _async_update_data(self) -> RouterSnapshot:
         try:
-            return await self.client.async_get_snapshot()
+            snapshot = await self.client.async_get_snapshot(
+                include_clients=self.track_clients
+            )
+            if self.track_clients:
+                snapshot.clients = self._client_presence.update(
+                    snapshot.clients, now=monotonic()
+                )
+            return snapshot
         except GLiNetAuthenticationError as err:
             raise ConfigEntryAuthFailed("GL.iNet authentication failed") from err
         except (GLiNetError, ClientError, TimeoutError) as err:

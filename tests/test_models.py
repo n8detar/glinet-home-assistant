@@ -8,7 +8,7 @@ from custom_components.glinet_router.models import (
 )
 
 
-def test_build_snapshot_exposes_useful_values_without_private_identifiers() -> None:
+def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> None:
     responses = {
         "system_info": {
             "model": "GL-X3000",
@@ -140,6 +140,11 @@ def test_build_snapshot_exposes_useful_values_without_private_identifiers() -> N
     assert snapshot.binary["ethernet_1_healthy"] is False
     assert snapshot.binary["cellular_connected"] is True
     assert snapshot.binary["tailscale_connected"] is True
+    client = snapshot.clients["11:22:33:44:55:66"]
+    assert client.name == "private-phone"
+    assert client.ip_address == "192.168.8.20"
+    assert client.interface == "5G"
+    assert client.connected is True
 
     serialized = repr(snapshot)
     for private_value in (
@@ -151,9 +156,6 @@ def test_build_snapshot_exposes_useful_values_without_private_identifiers() -> N
         "location-sensitive-cell",
         "private@example.com",
         "100.64.0.1",
-        "private-phone",
-        "11:22:33:44:55:66",
-        "192.168.8.20",
         "private-rule",
     ):
         assert private_value not in serialized

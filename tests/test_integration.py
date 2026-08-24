@@ -12,7 +12,7 @@ from custom_components.glinet_router.const import CONF_USE_SSL, DOMAIN, SERVICE_
 from custom_components.glinet_router.diagnostics import (
     async_get_config_entry_diagnostics,
 )
-from custom_components.glinet_router.models import RouterSnapshot
+from custom_components.glinet_router.models import RouterClient, RouterSnapshot
 
 pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
@@ -108,6 +108,15 @@ async def test_diagnostics_are_allowlisted(hass) -> None:
     )
     snapshot = sample_snapshot()
     snapshot.values["modem_bus"] = "private-bus"
+    snapshot.clients["00:11:22:33:44:55"] = RouterClient(
+        mac="00:11:22:33:44:55",
+        name="private-client",
+        ip_address="192.0.2.80",
+        connected=True,
+        interface="5G",
+        blocked=False,
+        remote=False,
+    )
     entry.runtime_data = type(
         "Runtime",
         (),
@@ -128,6 +137,9 @@ async def test_diagnostics_are_allowlisted(hass) -> None:
         "private-router.test",
         "private-password",
         "private-bus",
+        "private-client",
+        "00:11:22:33:44:55",
+        "192.0.2.80",
         "root",
     ):
         assert private not in serialized

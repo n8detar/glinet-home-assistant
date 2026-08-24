@@ -1,6 +1,6 @@
 # GL.iNet Router for Home Assistant
 
-A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x routers. The initial release is developed and read-only tested against a **GL-X3000 running firmware 4.8.3** with a Quectel RM520N-GL modem.
+A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x routers. The integration is developed and read-only tested against a **GL-X3000 running firmware 4.8.3** with a Quectel RM520N-GL modem.
 
 > This is an independent community integration and is not affiliated with GL.iNet or Home Assistant.
 
@@ -10,10 +10,12 @@ A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x r
 - In-memory SID handling, renewal, and one retry after session expiry
 - Async local polling through Home Assistant's shared HTTP session
 - Immediate normalization of router responses into a privacy-safe allowlist
-- Router, cellular, Multi-WAN, VPN, Tailscale, repeater, tethering, service, and aggregate-client entities
+- Router, cellular, Multi-WAN, VPN, Tailscale, repeater, tethering, and service entities
+- UniFi-style, MAC-stable client device trackers with stale-client handling
 - Constrained Cellular/Ethernet 1 failover-priority control
 - Optional, disabled-by-default bounded controls
 - SMS sending without retaining recipient or body in coordinator state or diagnostics
+- Companion GNSS setup through Home Assistant's built-in GPSD integration
 
 ## Compatibility
 
@@ -34,6 +36,8 @@ Authentication is based on the algorithm advertised by the router challenge. The
 3. Add `https://github.com/n8detar/glinet-home-assistant` as an **Integration**.
 4. Install **GL.iNet Router**.
 5. Restart Home Assistant.
+
+> HACS owns the `update.gl_inet_router_update` entity. If it shows Home Assistant's unavailable-logo placeholder instead of this integration's bundled icon, that is the upstream [HACS brands-proxy limitation](https://github.com/hacs/integration/issues/5179), not a missing repository asset. The HACS fix is being tracked in [hacs/integration#5339](https://github.com/hacs/integration/pull/5339); new custom-integration logos are no longer accepted into the legacy Home Assistant brands repository.
 
 ### Manual installation
 
@@ -61,6 +65,12 @@ The config flow requests:
 The default endpoint is `http://192.168.8.1/rpc`. The integration does not persist the SID.
 
 Using HTTPS is recommended when supported by the router. With HTTP, the administrator password-derived login exchange and SID travel over the local network without transport encryption.
+
+## GPS through gpsd
+
+GL-X3000 owners with an RM520N-GL modem should consider enabling the modem's GNSS receiver and connecting it to Home Assistant through the built-in [GPSD integration](https://www.home-assistant.io/integrations/gpsd/). This keeps location handling separate from the router integration and uses gpsd's standard local interface.
+
+See [GL-X3000 GNSS and Home Assistant through gpsd](docs/gpsd-home-assistant.md) for the verified firmware 4.8.3 setup, Home Assistant configuration, troubleshooting, and the security precautions for unauthenticated TCP port `2947`.
 
 ## Entities
 
@@ -108,7 +118,19 @@ Cell IDs, IMEI, IMSI, ICCID, APN credentials, SIM phone numbers, and exact locat
 - DDNS and ZeroTier state
 - Firewall-rule and port-forward counts
 
-Individual client entities are deliberately excluded from v1. Client names, hostnames, MAC addresses, and IP addresses are not retained.
+### Client device trackers
+
+Connected clients are exposed as default-enabled `device_tracker` entities using stable, normalized MAC addresses. Trackers report normal local-network metadata when the router supplies it:
+
+- MAC and IP address
+- Client name/hostname
+- Router interface (`2.4G`, `5G`, or `cable`)
+- Normalized connection type (`wireless`, `wired`, `remote`, or `unknown`)
+- Blocked and remote-client status
+
+The platform polls the local `clients.get_list` RPC because GL.iNet firmware does not provide UniFi-style push events. A client that briefly disappears or reports offline remains `home` for the configured detection period (five minutes by default), then changes to `not_home`. Clients that are already historical/offline on the first poll do not create entities. The integration does not independently create a separate device-registry device for every client; Home Assistant may associate a tracker with an existing MAC-identified device.
+
+Under **Settings → Devices & services → GL.iNet Router → Configure**, you can disable all client tracking, exclude wired clients, ignore randomized/locally administered wireless MAC addresses, or change the detection period. Client tracker states and attributes may be retained by Home Assistant Recorder; disable client tracking if you do not want those local identities stored. Existing entity-registry enable/disable choices are preserved across upgrades.
 
 ## Controls
 
