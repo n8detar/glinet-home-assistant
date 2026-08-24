@@ -40,7 +40,7 @@ mark_sms_read:
           integration: glinet_router
     message_id:
       name: Message ID
-      description: The message_id from a glinet_router_sms_received event.
+      description: The message_id from a glinet_router_sms_received event. Maximum 128 characters.
       required: true
       selector:
         text:
@@ -57,7 +57,7 @@ delete_sms:
           integration: glinet_router
     message_id:
       name: Message ID
-      description: The message_id from a glinet_router_sms_received event.
+      description: The message_id from a glinet_router_sms_received event. Maximum 128 characters.
       required: true
       selector:
         text:

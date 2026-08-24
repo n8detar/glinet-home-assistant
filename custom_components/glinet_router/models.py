@@ -170,14 +170,25 @@ def _optional_string(value: Any) -> str | None:
     return value or None
 
 
+def _sms_message_id(value: Any) -> str | None:
+    """Validate a router identifier while preserving its exact bytes as text."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > MAX_SMS_MESSAGE_ID_LENGTH
+    ):
+        return None
+    return value
+
+
 def parse_sms_messages(response: Any) -> list[SmsMessage]:
     """Normalize transient SMS records without retaining unrelated fields."""
     records = _list(_dict(response).get("list"))
     messages: list[SmsMessage] = []
     for record in records:
         raw = _dict(record)
-        message_id = _optional_string(raw.get("name"))
-        if message_id is None or len(message_id) > MAX_SMS_MESSAGE_ID_LENGTH:
+        message_id = _sms_message_id(raw.get("name"))
+        if message_id is None:
             continue
         message_type = raw.get("type")
         status = raw.get("status")

@@ -46,7 +46,7 @@
       "description": "Permanently delete one SMS from the selected GL.iNet router. This cannot be undone.",
       "fields": {
         "message_id": {
-          "description": "The message ID from a received-SMS event.",
+          "description": "The message ID from a received-SMS event. Maximum 128 characters.",
           "name": "Message ID"
         }
       },
@@ -56,7 +56,7 @@
       "description": "Mark one received SMS as read on the selected GL.iNet router.",
       "fields": {
         "message_id": {
-          "description": "The message ID from a received-SMS event.",
+          "description": "The message ID from a received-SMS event. Maximum 128 characters.",
           "name": "Message ID"
         }
       },

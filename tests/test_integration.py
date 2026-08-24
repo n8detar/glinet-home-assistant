@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 import voluptuous as vol
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -183,6 +184,8 @@ async def test_sms_services_remain_until_last_config_entry_unloads(
     monkeypatch.setattr(
         GLiNetApiClient, "async_get_sms_messages", AsyncMock(return_value=[])
     )
+    delete_sms = AsyncMock()
+    monkeypatch.setattr(GLiNetApiClient, "async_delete_sms", delete_sms)
     entries = []
     for suffix in ("one", "two"):
         entry = MockConfigEntry(
@@ -202,9 +205,28 @@ async def test_sms_services_remain_until_last_config_entry_unloads(
         entries.append(entry)
     await hass.async_block_till_done()
 
+    for data in (
+        {"message_id": "sms-inbound-1"},
+        {"config_entry_id": "unknown-entry", "message_id": "sms-inbound-1"},
+    ):
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(DOMAIN, "delete_sms", data, blocking=True)
+
     assert await hass.config_entries.async_unload(entries[0].entry_id)
     for service in ("send_sms", "mark_sms_read", "delete_sms"):
         assert hass.services.has_service(DOMAIN, service)
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            "delete_sms",
+            {
+                "config_entry_id": entries[0].entry_id,
+                "message_id": "sms-inbound-1",
+            },
+            blocking=True,
+        )
+    delete_sms.assert_not_awaited()
 
     assert await hass.config_entries.async_unload(entries[1].entry_id)
     for service in ("send_sms", "mark_sms_read", "delete_sms"):

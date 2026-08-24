@@ -62,6 +62,26 @@ def test_parse_sms_messages_normalizes_verified_fields() -> None:
     assert "2026-08-24 10:00:00" not in representation
 
 
+def test_sms_message_identifiers_are_validated_without_transformation() -> None:
+    exact = "  device-id  "
+    messages = parse_sms_messages(
+        {
+            "list": [
+                {"name": exact, "body": "valid", "type": 0, "status": 0},
+                {"name": "   ", "body": "blank", "type": 0, "status": 0},
+                {
+                    "name": f" {'x' * 128} ",
+                    "body": "raw identifier is over the bound",
+                    "type": 0,
+                    "status": 0,
+                },
+            ]
+        }
+    )
+
+    assert [message.message_id for message in messages] == [exact]
+
+
 def test_sms_inbox_tracker_suppresses_startup_and_emits_new_inbound_once() -> None:
     tracker = SmsInboxTracker()
     initial = parse_sms_messages(
