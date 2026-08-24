@@ -45,7 +45,7 @@ SEND_SMS_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Required(ATTR_PHONE_NUMBER): vol.All(cv.string, vol.Length(min=3, max=32)),
-        vol.Required(ATTR_MESSAGE): vol.All(cv.string, vol.Length(min=1, max=1600)),
+        vol.Required(ATTR_MESSAGE): vol.All(cv.string, vol.Length(min=1, max=160)),
     }
 )
 
