@@ -197,6 +197,8 @@ data:
 
 Use E.164 international format: `+`, the country code, and digits only. For a US or Canadian destination, use `+1` immediately followed by the 10-digit number (`+1XXXXXXXXXX`). The integration sends the value to the router unchanged and does not remove spaces, parentheses, or hyphens.
 
+Messages are limited to 160 characters, matching the GL.iNet WebUI limit. The action rejects longer bodies before sending them to the router.
+
 The destination and body are passed directly to `modem.send_sms`. They are not added to coordinator data, entity states, diagnostics, or integration logs. Home Assistant automation traces and YAML are outside the integration's control and may retain action inputs; use trace retention appropriate for sensitive messages.
 
 ## Privacy and diagnostics

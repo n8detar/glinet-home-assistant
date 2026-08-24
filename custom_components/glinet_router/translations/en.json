@@ -46,7 +46,7 @@
       "description": "Send an SMS through a supported cellular modem. Phone numbers and message bodies are not logged or retained.",
       "fields": {
         "message": {
-          "description": "SMS body",
+          "description": "SMS body. Maximum 160 characters, matching the GL.iNet WebUI limit.",
           "name": "Message"
         },
         "phone_number": {

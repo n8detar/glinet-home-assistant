@@ -22,7 +22,7 @@ send_sms:
         text:
     message:
       name: Message
-      description: SMS body.
+      description: SMS body. Maximum 160 characters, matching the GL.iNet WebUI limit.
       required: true
       selector:
         text:
