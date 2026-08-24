@@ -27,3 +27,37 @@ send_sms:
       selector:
         text:
           multiline: true
+
+mark_sms_read:
+  name: Mark SMS read
+  description: Mark one received SMS as read on the selected GL.iNet router.
+  fields:
+    config_entry_id:
+      name: Router
+      description: Required only when more than one GL.iNet router is loaded.
+      selector:
+        config_entry:
+          integration: glinet_router
+    message_id:
+      name: Message ID
+      description: The message_id from a glinet_router_sms_received event. Maximum 128 characters.
+      required: true
+      selector:
+        text:
+
+delete_sms:
+  name: Delete SMS
+  description: Permanently delete one SMS from the selected GL.iNet router. This cannot be undone.
+  fields:
+    config_entry_id:
+      name: Router
+      description: Required only when more than one GL.iNet router is loaded.
+      selector:
+        config_entry:
+          integration: glinet_router
+    message_id:
+      name: Message ID
+      description: The message_id from a glinet_router_sms_received event. Maximum 128 characters.
+      required: true
+      selector:
+        text:

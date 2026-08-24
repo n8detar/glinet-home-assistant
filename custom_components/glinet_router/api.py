@@ -8,7 +8,13 @@ from typing import Any, Final, Protocol
 
 from passlib.hash import md5_crypt, sha256_crypt, sha512_crypt
 
-from .models import RouterSnapshot, build_failover_payload, build_snapshot
+from .models import (
+    RouterSnapshot,
+    SmsMessage,
+    build_failover_payload,
+    build_snapshot,
+    parse_sms_messages,
+)
 
 _SUPPORTED_HASHES: Final = {"md5", "sha256", "sha512"}
 
@@ -308,6 +314,41 @@ class GLiNetApiClient:
                 "timeout": 0,
             },
         )
+
+    async def async_get_sms_messages(self) -> list[SmsMessage]:
+        """Fetch and normalize the SMS inbox for transient processing."""
+        response = await self.async_call("modem", "get_sms_list")
+        if not isinstance(response, dict) or not isinstance(response.get("list"), list):
+            raise GLiNetRpcError(None, "Malformed SMS inbox response")
+        return parse_sms_messages(response)
+
+    async def async_mark_sms_read(self, *, message_id: str) -> None:
+        """Mark one SMS inbox message read."""
+        await self._async_serialized_call(
+            "modem", "set_sms", {"name": message_id, "status": 1}
+        )
+
+    async def async_delete_sms(self, *, message_id: str) -> None:
+        """Delete one named SMS inbox message."""
+        await self._async_serialized_call(
+            "modem", "remove_sms", {"name": message_id, "scope": 10}
+        )
+
+    async def async_mark_all_sms_read(self) -> None:
+        """Mark every currently unread inbound SMS message read."""
+        async with self._write_lock:
+            messages = await self.async_get_sms_messages()
+            for message in messages:
+                if message.message_type == 0 and message.status == 0:
+                    await self.async_call(
+                        "modem",
+                        "set_sms",
+                        {"name": message.message_id, "status": 1},
+                    )
+
+    async def async_delete_all_read_sms(self) -> None:
+        """Delete all SMS messages the router currently marks read."""
+        await self._async_serialized_call("modem", "remove_sms", {"scope": 1})
 
     async def async_set_tailscale(self, key: str, enabled: bool) -> None:
         """Change one allowlisted Tailscale setting while preserving the others."""

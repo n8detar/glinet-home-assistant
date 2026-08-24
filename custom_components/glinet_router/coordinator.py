@@ -22,8 +22,9 @@ from .const import (
     DEFAULT_DETECTION_TIME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    EVENT_SMS_RECEIVED,
 )
-from .models import ClientPresenceStore, RouterSnapshot
+from .models import ClientPresenceStore, RouterSnapshot, SmsInboxTracker
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
             include_wired=bool(entry.options.get(CONF_TRACK_WIRED_CLIENTS, True)),
             ignore_local_mac=bool(entry.options.get(CONF_IGNORE_LOCAL_MAC, False)),
         )
+        self._sms_inbox = SmsInboxTracker()
+        self._sms_inbox_supported = False
         scan_interval = int(
             entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         )
@@ -67,6 +70,28 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
                 snapshot.clients = self._client_presence.update(
                     snapshot.clients, now=monotonic()
                 )
+            if "sms" in snapshot.capabilities:
+                try:
+                    messages = await self.client.async_get_sms_messages()
+                except GLiNetAuthenticationError:
+                    raise
+                except (GLiNetError, ClientError, TimeoutError):
+                    pass
+                else:
+                    self._sms_inbox_supported = True
+                    for message in self._sms_inbox.process(messages):
+                        self.hass.bus.async_fire(
+                            EVENT_SMS_RECEIVED,
+                            {
+                                "config_entry_id": self.entry.entry_id,
+                                "message_id": message.message_id,
+                                "from": message.sender,
+                                "message": message.message,
+                                "date": message.date,
+                            },
+                        )
+            if self._sms_inbox_supported:
+                snapshot.capabilities.add("sms_inbox")
             return snapshot
         except GLiNetAuthenticationError as err:
             raise ConfigEntryAuthFailed("GL.iNet authentication failed") from err
@@ -95,4 +120,14 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
         if not isinstance(bus, str):
             raise GLiNetError("No cellular modem bus is available")
         await self.client.async_reconnect_cellular(bus=bus)
+        await self.async_request_refresh()
+
+    async def async_mark_all_sms_read(self) -> None:
+        """Mark every unread inbound SMS read, then refresh state."""
+        await self.client.async_mark_all_sms_read()
+        await self.async_request_refresh()
+
+    async def async_delete_all_read_sms(self) -> None:
+        """Delete every SMS currently marked read, then refresh state."""
+        await self.client.async_delete_all_read_sms()
         await self.async_request_refresh()

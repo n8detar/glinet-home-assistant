@@ -26,6 +26,7 @@ class GLiNetButtonDescription(ButtonEntityDescription):
 
     action: str
     required_capability: str
+    discovery_capability: str | None = None
 
 
 BUTTONS: tuple[GLiNetButtonDescription, ...] = (
@@ -49,6 +50,26 @@ BUTTONS: tuple[GLiNetButtonDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         entity_registry_enabled_default=False,
     ),
+    GLiNetButtonDescription(
+        key="mark_all_sms_read",
+        name="Mark all SMS read",
+        action="mark_all_sms_read",
+        required_capability="sms_inbox",
+        discovery_capability="sms",
+        icon="mdi:email-check-outline",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
+    GLiNetButtonDescription(
+        key="delete_all_read_sms",
+        name="Delete all read SMS",
+        action="delete_all_read_sms",
+        required_capability="sms_inbox",
+        discovery_capability="sms",
+        icon="mdi:delete-sweep-outline",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
 )
 
 
@@ -62,7 +83,8 @@ async def async_setup_entry(
     async_add_entities(
         GLiNetButton(coordinator, entry, description)
         for description in BUTTONS
-        if description.required_capability in coordinator.data.capabilities
+        if (description.discovery_capability or description.required_capability)
+        in coordinator.data.capabilities
     )
 
 
@@ -71,6 +93,15 @@ class GLiNetButton(GLiNetEntity, ButtonEntity):
 
     entity_description: GLiNetButtonDescription
 
+    @property
+    def available(self) -> bool:
+        """Expose the button only while its mutation capability is verified."""
+        return (
+            super().available
+            and self.entity_description.required_capability
+            in self.coordinator.data.capabilities
+        )
+
     async def async_press(self) -> None:
         """Execute the selected disruptive action."""
         try:
@@ -78,6 +109,10 @@ class GLiNetButton(GLiNetEntity, ButtonEntity):
                 await self.coordinator.async_reboot_router()
             elif self.entity_description.action == "reconnect_cellular":
                 await self.coordinator.async_reconnect_cellular()
+            elif self.entity_description.action == "mark_all_sms_read":
+                await self.coordinator.async_mark_all_sms_read()
+            elif self.entity_description.action == "delete_all_read_sms":
+                await self.coordinator.async_delete_all_read_sms()
             else:
                 raise HomeAssistantError("Unsupported GL.iNet button action")
         except GLiNetError as err:

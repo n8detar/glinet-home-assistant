@@ -8,5 +8,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/n8detar/glinet-home-assistant/issues",
   "requirements": ["passlib==1.7.4"],
-  "version": "0.2.1"
+  "version": "2026.8.0"
 }
