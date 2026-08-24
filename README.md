@@ -169,9 +169,11 @@ Action:
 action: glinet_router.send_sms
 data:
   config_entry_id: "CONFIG_ENTRY_ID"
-  phone_number: "+15551234567"
+  phone_number: "+1XXXXXXXXXX"
   message: "Home Assistant test"
 ```
+
+Use E.164 international format: `+`, the country code, and digits only. For a US or Canadian destination, use `+1` immediately followed by the 10-digit number (`+1XXXXXXXXXX`). The integration sends the value to the router unchanged and does not remove spaces, parentheses, or hyphens.
 
 The destination and body are passed directly to `modem.send_sms`. They are not added to coordinator data, entity states, diagnostics, or integration logs. Home Assistant automation traces and YAML are outside the integration's control and may retain action inputs; use trace retention appropriate for sensitive messages.
 

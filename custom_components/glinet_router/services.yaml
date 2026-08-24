@@ -10,9 +10,14 @@ send_sms:
           integration: glinet_router
     phone_number:
       name: Phone number
-      description: Destination phone number.
+      description: >-
+        Destination phone number in E.164 international format: +, country
+        code, and digits only. For US and Canadian numbers, use +1 immediately
+        followed by the 10-digit number. The integration passes this value to
+        the router unchanged; it does not remove spaces, parentheses, or
+        hyphens.
       required: true
-      example: "+15551234567"
+      example: "+1XXXXXXXXXX"
       selector:
         text:
     message:
