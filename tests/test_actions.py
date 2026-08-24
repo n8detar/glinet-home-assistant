@@ -92,6 +92,151 @@ async def test_send_sms_uses_minimum_verified_payload() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_sms_messages_normalizes_inbox_response() -> None:
+    session = FakeSession(
+        [
+            {
+                "result": {
+                    "list": [
+                        {
+                            "name": "sms-inbound-1",
+                            "phone_number": "+155****0100",
+                            "body": "Private test body",
+                            "type": 0,
+                            "status": 0,
+                        }
+                    ]
+                }
+            }
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    messages = await client.async_get_sms_messages()
+
+    assert [message.message_id for message in messages] == ["sms-inbound-1"]
+    assert session.requests[0]["json"]["params"][1:] == [
+        "modem",
+        "get_sms_list",
+        {},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_sms_messages_rejects_malformed_list() -> None:
+    session = FakeSession([{"result": {"unexpected": []}}])
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    with pytest.raises(GLiNetRpcError, match="Malformed SMS inbox response"):
+        await client.async_get_sms_messages()
+
+
+@pytest.mark.asyncio
+async def test_mark_sms_read_uses_verified_payload() -> None:
+    session = FakeSession([{"result": []}])
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_mark_sms_read(message_id="sms-inbound-1")
+
+    assert session.requests[0]["json"]["params"][1:] == [
+        "modem",
+        "set_sms",
+        {"name": "sms-inbound-1", "status": 1},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_sms_uses_single_message_scope() -> None:
+    session = FakeSession([{"result": []}])
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_delete_sms(message_id="sms-inbound-1")
+
+    assert session.requests[0]["json"]["params"][1:] == [
+        "modem",
+        "remove_sms",
+        {"name": "sms-inbound-1", "scope": 10},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mark_all_sms_read_updates_only_unread_inbound_messages() -> None:
+    session = FakeSession(
+        [
+            {
+                "result": {
+                    "list": [
+                        {"name": "unread", "type": 0, "status": 0},
+                        {"name": "already-read", "type": 0, "status": 1},
+                        {"name": "sent", "type": 1, "status": 2},
+                    ]
+                }
+            },
+            {"result": []},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_mark_all_sms_read()
+
+    calls = [request["json"]["params"][1:] for request in session.requests]
+    assert calls == [
+        ["modem", "get_sms_list", {}],
+        ["modem", "set_sms", {"name": "unread", "status": 1}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_all_read_sms_uses_read_scope() -> None:
+    session = FakeSession([{"result": []}])
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_delete_all_read_sms()
+
+    assert session.requests[0]["json"]["params"][1:] == [
+        "modem",
+        "remove_sms",
+        {"scope": 1},
+    ]
+
+
+@pytest.mark.asyncio
 async def test_reboot_router_uses_system_reboot() -> None:
     session = FakeSession([{"result": []}])
     client = GLiNetApiClient(

@@ -4,6 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "glinet_router"
 MANUFACTURER: Final = "GL.iNet"
+MAX_SMS_MESSAGE_ID_LENGTH: Final = 128
 DEFAULT_NAME: Final = "GL.iNet Router"
 DEFAULT_HOST: Final = "192.168.8.1"
 DEFAULT_USERNAME: Final = "root"
@@ -22,8 +23,12 @@ CONF_IGNORE_LOCAL_MAC: Final = "ignore_local_mac"
 CONF_DETECTION_TIME: Final = "detection_time"
 
 SERVICE_SEND_SMS: Final = "send_sms"
+SERVICE_MARK_SMS_READ: Final = "mark_sms_read"
+SERVICE_DELETE_SMS: Final = "delete_sms"
 ATTR_PHONE_NUMBER: Final = "phone_number"
 ATTR_MESSAGE: Final = "message"
+ATTR_MESSAGE_ID: Final = "message_id"
+EVENT_SMS_RECEIVED: Final = f"{DOMAIN}_sms_received"
 
 CONTROL_WARNING: Final = (
     "This entity changes router connectivity or configuration and may interrupt access."

@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
+from .const import MAX_SMS_MESSAGE_ID_LENGTH
+
 PRIORITY_ETHERNET_FIRST: Final = "Ethernet before cellular"
 PRIORITY_CELLULAR_FIRST: Final = "Cellular before Ethernet"
 PRIORITY_OPTIONS: Final = (PRIORITY_ETHERNET_FIRST, PRIORITY_CELLULAR_FIRST)
@@ -53,6 +55,48 @@ class RouterClient:
     interface: str | None
     blocked: bool
     remote: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SmsMessage:
+    """One transient, normalized SMS inbox record."""
+
+    message_id: str
+    sender: str | None = field(repr=False)
+    message: str = field(repr=False)
+    date: str | None = field(repr=False)
+    message_type: int | None
+    status: int | None
+
+
+@dataclass(slots=True)
+class SmsInboxTracker:
+    """Track message identities in memory without retaining private message data.
+
+    IDs are intentionally retained for the coordinator lifetime. Pruning deleted IDs
+    could replay a delayed or reordered inbox record; a config-entry reload discards
+    the set and establishes a fresh private baseline without persisting identifiers.
+    """
+
+    _initialized: bool = field(default=False, init=False)
+    _known_ids: set[str] = field(default_factory=set, init=False)
+
+    def process(self, messages: list[SmsMessage]) -> list[SmsMessage]:
+        """Return new inbound messages after establishing the startup baseline."""
+        if not self._initialized:
+            self._known_ids.update(message.message_id for message in messages)
+            self._initialized = True
+            return []
+        new_messages: list[SmsMessage] = []
+        seen_ids = set(self._known_ids)
+        for message in messages:
+            if message.message_id in seen_ids:
+                continue
+            seen_ids.add(message.message_id)
+            if message.message_type == 0:
+                new_messages.append(message)
+        self._known_ids = seen_ids
+        return new_messages
 
 
 @dataclass(slots=True)
@@ -124,6 +168,43 @@ def _optional_string(value: Any) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def parse_sms_messages(response: Any) -> list[SmsMessage]:
+    """Normalize transient SMS records without retaining unrelated fields."""
+    records = _list(_dict(response).get("list"))
+    messages: list[SmsMessage] = []
+    for record in records:
+        raw = _dict(record)
+        message_id = _optional_string(raw.get("name"))
+        if message_id is None or len(message_id) > MAX_SMS_MESSAGE_ID_LENGTH:
+            continue
+        message_type = raw.get("type")
+        status = raw.get("status")
+        body = raw.get("body")
+        if not isinstance(body, str):
+            body = ""
+        messages.append(
+            SmsMessage(
+                message_id=message_id,
+                sender=_optional_string(raw.get("sender"))
+                or _optional_string(raw.get("phone_number")),
+                message=body,
+                date=_optional_string(raw.get("date")),
+                message_type=(
+                    message_type
+                    if isinstance(message_type, int)
+                    and not isinstance(message_type, bool)
+                    else None
+                ),
+                status=(
+                    status
+                    if isinstance(status, int) and not isinstance(status, bool)
+                    else None
+                ),
+            )
+        )
+    return messages
 
 
 def _number(value: Any) -> int | float | None:

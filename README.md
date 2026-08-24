@@ -1,8 +1,10 @@
 # GL.iNet Router for Home Assistant
 
-A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x routers. The integration is developed and read-only tested against a **GL-X3000 running firmware 4.8.3** with a Quectel RM520N-GL modem.
+A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x routers. The integration is developed and API-tested against a **GL-X3000 running firmware 4.8.3** with a Quectel RM520N-GL modem.
 
 > This is an independent community integration and is not affiliated with GL.iNet or Home Assistant.
+>
+> **AI-generated project disclaimer:** This project was generated and is maintained with substantial AI assistance under human direction and review. It is provided **as is**, without warranty of any kind. Review the source and test it in your own environment before relying on it, especially for SMS, network configuration, or other state-changing operations. See the [MIT License](LICENSE) for the full warranty and liability terms.
 
 ## Highlights
 
@@ -14,16 +16,20 @@ A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x r
 - UniFi-style, MAC-stable client device trackers with stale-client handling
 - Constrained Cellular/Ethernet 1 failover-priority control
 - Optional, disabled-by-default bounded controls
-- SMS sending without retaining recipient or body in coordinator state or diagnostics
+- SMS sending, inbox events, and bounded read/delete controls without retaining message contents in coordinator state or diagnostics
 - Companion GNSS setup through Home Assistant's built-in GPSD integration
 
 ## Compatibility
 
 | Device | Firmware | Status |
 | --- | --- | --- |
-| GL-X3000 | 4.8.3 | Read-only API and authentication verified |
+| GL-X3000 | 4.8.3 | API-tested, including deliberately bounded SMS actions |
 | Other GL.iNet firmware 4.x routers | Unknown | May work, but endpoint availability and response schemas differ |
 | Firmware 3.x | Unsupported/untested | Use an integration designed for the older API |
+
+## Versioning
+
+Starting with `2026.8.0`, releases use Home Assistant-style calendar versions: `YYYY.M.patch`. The year and month identify the release line, and the patch number starts at `0` and increments for follow-up releases in that month. This does not imply a release every month.
 
 Authentication is based on the algorithm advertised by the router challenge. The password is stored only in Home Assistant's config-entry storage. The temporary SID exists only in memory.
 
@@ -183,9 +189,9 @@ The following unrestricted controls are **not exposed**:
 - Firewall, DMZ, or port-forward mutation
 - Firmware updates
 
-## SMS action
+## SMS actions and events
 
-Action:
+Send an SMS:
 
 ```yaml
 action: glinet_router.send_sms
@@ -199,7 +205,24 @@ Use E.164 international format: `+`, the country code, and digits only. For a US
 
 Messages are limited to 160 characters, matching the GL.iNet WebUI limit. The action rejects longer bodies before sending them to the router.
 
-The destination and body are passed directly to `modem.send_sms`. They are not added to coordinator data, entity states, diagnostics, or integration logs. Home Assistant automation traces and YAML are outside the integration's control and may retain action inputs; use trace retention appropriate for sensitive messages.
+The integration also provides:
+
+- `glinet_router.mark_sms_read`, which marks one message read using the event's `message_id`.
+- `glinet_router.delete_sms`, which permanently deletes one explicitly identified message and cannot be undone.
+- A disabled-by-default **Mark all SMS read** button, which updates only unread received messages.
+- A disabled-by-default **Delete all read SMS** button, which permanently deletes every message the router marks read.
+
+When inbox support is available, each normal coordinator poll checks `modem.get_sms_list`. After establishing an initial baseline, a newly observed received message fires `glinet_router_sms_received` once per integration runtime. Existing messages do not replay at setup or reload. The event data is:
+
+| Field | Description |
+| --- | --- |
+| `config_entry_id` | Router config-entry ID for multi-router routing |
+| `message_id` | Router message identifier accepted by the mark-read and delete actions |
+| `from` | Sender number, when reported |
+| `message` | Full SMS body |
+| `date` | Router-provided date, when reported |
+
+Inbox records are processed transiently and are not added to coordinator data, entity states, diagnostics, or integration logs. The integration retains only observed message IDs in memory for event deduplication. **Home Assistant events, automation traces, logbook entries, YAML, and downstream notifications may retain sender numbers, message bodies, and action inputs.** Configure Recorder and trace retention appropriately before using SMS automations.
 
 ## Privacy and diagnostics
 
@@ -221,7 +244,7 @@ Unknown numeric enums are kept numeric until verified rather than assigned specu
 
 Core system calls determine coordinator health. Optional subsystem RPC failures are isolated so an unsupported VPN, DDNS, firewall, or modem endpoint does not make unrelated router entities unavailable. Authentication failures trigger Home Assistant's config-entry reauthentication handling.
 
-The routine cellular poll uses `modem.get_status`; historical/heavy modem calls are not polled.
+The routine cellular poll uses `modem.get_status`. SMS-capable routers also poll `modem.get_sms_list` for received-message events; inbox contents are handled transiently rather than stored in coordinator data. Other historical/heavy modem calls are not polled.
 
 ## Development
 
@@ -232,7 +255,7 @@ uv run --with ruff ruff format --check .
 python3 -m compileall -q custom_components
 ```
 
-Development and live verification do not require installing the integration into the production Home Assistant instance. Live tests used read-only RPCs only.
+Development and live verification do not require installing the integration into the production Home Assistant instance. No live SMS read or delete mutation was executed while developing the inbox controls; mutation payloads were implemented from the sanitized firmware audit.
 
 ## License
 

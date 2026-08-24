@@ -42,6 +42,26 @@
     }
   },
   "services": {
+    "delete_sms": {
+      "description": "Permanently delete one SMS from the selected GL.iNet router. This cannot be undone.",
+      "fields": {
+        "message_id": {
+          "description": "The message ID from a received-SMS event.",
+          "name": "Message ID"
+        }
+      },
+      "name": "Delete SMS"
+    },
+    "mark_sms_read": {
+      "description": "Mark one received SMS as read on the selected GL.iNet router.",
+      "fields": {
+        "message_id": {
+          "description": "The message ID from a received-SMS event.",
+          "name": "Message ID"
+        }
+      },
+      "name": "Mark SMS read"
+    },
     "send_sms": {
       "description": "Send an SMS through a supported cellular modem. Phone numbers and message bodies are not logged or retained.",
       "fields": {
