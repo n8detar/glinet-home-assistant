@@ -224,6 +224,41 @@ When inbox support is available, each normal coordinator poll checks `modem.get_
 
 Inbox records are processed transiently and are not added to coordinator data, entity states, diagnostics, or integration logs. The integration retains only observed message IDs in memory for event deduplication. **Home Assistant events, automation traces, logbook entries, YAML, and downstream notifications may retain sender numbers, message bodies, and action inputs.** Configure Recorder and trace retention appropriately before using SMS automations.
 
+### Example: forward received SMS to a fixed number
+
+This automation forwards newly received messages to one configured destination, marks each exact source message read, and then permanently deletes it. Replace the placeholder with your destination in E.164 format. The event-provided `config_entry_id` routes every action to the same router that received the message. The explicit slice keeps the sender prefix and body within the router's 160-character limit.
+
+Keep the actions in this order and do not enable `continue_on_error`: if forwarding fails, Home Assistant stops the sequence before the source is marked or deleted. A successful `send_sms` action means the router accepted the request; it does **not** prove carrier delivery. This example can therefore delete the source even when the forwarded SMS never reaches the destination—omit `delete_sms` if retaining the source is more important. **`glinet_router.delete_sms` is permanent and irreversible.** Marking the message read immediately before deleting it is redundant for the final inbox state, but both actions are included to demonstrate specific-message control with the event-provided `message_id`. Queued mode allows up to ten active or queued runs; Home Assistant rejects additional triggers while that bound is full, leaving their source messages untouched on the router.
+
+**Forwarding exports potentially sensitive SMS content—including one-time codes and account alerts—to the destination handset, carrier, notification surfaces, and any associated backups.**
+
+```yaml
+alias: Forward and remove received GL.iNet SMS
+triggers:
+  - trigger: event
+    event_type: glinet_router_sms_received
+conditions: []
+actions:
+  - action: glinet_router.send_sms
+    data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
+      phone_number: "+1XXXXXXXXXX"
+      message: >-
+        {{ ((trigger.event.data.from | default('Unknown sender', true)) ~ ': ' ~ trigger.event.data.message)[:160] }}
+  - action: glinet_router.mark_sms_read
+    data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
+      message_id: "{{ trigger.event.data.message_id }}"
+  - action: glinet_router.delete_sms
+    data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
+      message_id: "{{ trigger.event.data.message_id }}"
+mode: queued
+max: 10
+```
+
+Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, verify the event has a usable sender, normalize it to valid E.164, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents.
+
 ## Privacy and diagnostics
 
 Raw JSON-RPC response trees are discarded after every poll. Diagnostics are generated only from normalized allowlisted data and exclude:
