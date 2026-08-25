@@ -226,10 +226,12 @@ Inbox records are processed transiently and are not added to coordinator data, e
 
 ### Example: forward received SMS to a fixed number
 
-This automation forwards each newly received message to one configured destination. Replace the placeholder with your destination in E.164 format. The explicit slice keeps the sender prefix and body within the router's 160-character limit. It does not mark messages read or delete them from the router.
+This automation forwards each newly received message to one configured destination, marks that exact source message read, and then permanently deletes it. Replace the placeholder with your destination in E.164 format. The explicit slice keeps the sender prefix and body within the router's 160-character limit.
+
+Keep the actions in this order and do not enable `continue_on_error`: if forwarding fails, Home Assistant stops the sequence before the source is marked or deleted. **`glinet_router.delete_sms` is permanent and irreversible.** Marking the message read immediately before deleting it is redundant for the final inbox state, but both actions are included to demonstrate specific-message control with the event-provided `message_id`.
 
 ```yaml
-alias: Forward GL.iNet SMS
+alias: Forward and remove received GL.iNet SMS
 triggers:
   - trigger: event
     event_type: glinet_router_sms_received
@@ -240,11 +242,17 @@ actions:
       phone_number: "+1XXXXXXXXXX"
       message: >-
         {{ ((trigger.event.data.from | default('Unknown sender', true)) ~ ': ' ~ trigger.event.data.message)[:160] }}
+  - action: glinet_router.mark_sms_read
+    data:
+      message_id: "{{ trigger.event.data.message_id }}"
+  - action: glinet_router.delete_sms
+    data:
+      message_id: "{{ trigger.event.data.message_id }}"
 mode: queued
 max: 10
 ```
 
-Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents. Mark-read or permanent-delete actions can be added separately when that behavior is explicitly desired.
+Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents.
 
 ## Privacy and diagnostics
 
