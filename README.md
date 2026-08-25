@@ -224,6 +224,28 @@ When inbox support is available, each normal coordinator poll checks `modem.get_
 
 Inbox records are processed transiently and are not added to coordinator data, entity states, diagnostics, or integration logs. The integration retains only observed message IDs in memory for event deduplication. **Home Assistant events, automation traces, logbook entries, YAML, and downstream notifications may retain sender numbers, message bodies, and action inputs.** Configure Recorder and trace retention appropriately before using SMS automations.
 
+### Example: forward received SMS to a fixed number
+
+This automation forwards each newly received message to one configured destination. Replace the placeholder with your destination in E.164 format. The explicit slice keeps the sender prefix and body within the router's 160-character limit. It does not mark messages read or delete them from the router.
+
+```yaml
+alias: Forward GL.iNet SMS
+triggers:
+  - trigger: event
+    event_type: glinet_router_sms_received
+conditions: []
+actions:
+  - action: glinet_router.send_sms
+    data:
+      phone_number: "+1XXXXXXXXXX"
+      message: >-
+        {{ ((trigger.event.data.from | default('Unknown sender', true)) ~ ': ' ~ trigger.event.data.message)[:160] }}
+mode: queued
+max: 10
+```
+
+Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents. Mark-read or permanent-delete actions can be added separately when that behavior is explicitly desired.
+
 ## Privacy and diagnostics
 
 Raw JSON-RPC response trees are discarded after every poll. Diagnostics are generated only from normalized allowlisted data and exclude:
