@@ -257,7 +257,7 @@ mode: queued
 max: 10
 ```
 
-Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents.
+Another option is an AI-assisted autoresponder: pass `trigger.event.data.message` to `conversation.process`, capture its `response_variable`, and send the response to the originating number. If you build that workflow, verify the event has a usable sender, normalize it to valid E.164, allowlist trusted senders, use an Assist agent without Home Assistant control capabilities, handle empty responses, and enforce the 160-character limit in the automation rather than relying only on the prompt. Incoming SMS is untrusted input, and both automation traces and the conversation provider may retain its contents.
 
 ## Privacy and diagnostics
 
