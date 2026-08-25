@@ -226,9 +226,11 @@ Inbox records are processed transiently and are not added to coordinator data, e
 
 ### Example: forward received SMS to a fixed number
 
-This automation forwards each newly received message to one configured destination, marks that exact source message read, and then permanently deletes it. Replace the placeholder with your destination in E.164 format. The explicit slice keeps the sender prefix and body within the router's 160-character limit.
+This automation forwards newly received messages to one configured destination, marks each exact source message read, and then permanently deletes it. Replace the placeholder with your destination in E.164 format. The event-provided `config_entry_id` routes every action to the same router that received the message. The explicit slice keeps the sender prefix and body within the router's 160-character limit.
 
-Keep the actions in this order and do not enable `continue_on_error`: if forwarding fails, Home Assistant stops the sequence before the source is marked or deleted. **`glinet_router.delete_sms` is permanent and irreversible.** Marking the message read immediately before deleting it is redundant for the final inbox state, but both actions are included to demonstrate specific-message control with the event-provided `message_id`.
+Keep the actions in this order and do not enable `continue_on_error`: if forwarding fails, Home Assistant stops the sequence before the source is marked or deleted. **`glinet_router.delete_sms` is permanent and irreversible.** Marking the message read immediately before deleting it is redundant for the final inbox state, but both actions are included to demonstrate specific-message control with the event-provided `message_id`. Queued mode allows up to ten active or queued runs; Home Assistant rejects additional triggers while that bound is full.
+
+**Forwarding exports potentially sensitive SMS content—including one-time codes and account alerts—to the destination handset, carrier, notification surfaces, and any associated backups.**
 
 ```yaml
 alias: Forward and remove received GL.iNet SMS
@@ -239,14 +241,17 @@ conditions: []
 actions:
   - action: glinet_router.send_sms
     data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
       phone_number: "+1XXXXXXXXXX"
       message: >-
         {{ ((trigger.event.data.from | default('Unknown sender', true)) ~ ': ' ~ trigger.event.data.message)[:160] }}
   - action: glinet_router.mark_sms_read
     data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
       message_id: "{{ trigger.event.data.message_id }}"
   - action: glinet_router.delete_sms
     data:
+      config_entry_id: "{{ trigger.event.data.config_entry_id }}"
       message_id: "{{ trigger.event.data.message_id }}"
 mode: queued
 max: 10
