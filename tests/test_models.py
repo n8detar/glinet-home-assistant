@@ -31,6 +31,7 @@ def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> N
             "service": [{"name": "tailscale", "status": 1}],
         },
         "fan_status": {"speed": 1200, "status": True},
+        "led_config": {"led_enable": True},
         "kmwan_config": {
             "mode": 0,
             "interfaces": [
@@ -139,7 +140,9 @@ def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> N
     assert snapshot.binary["repeater_healthy"] is True
     assert snapshot.binary["ethernet_1_healthy"] is False
     assert snapshot.binary["cellular_connected"] is True
+    assert snapshot.binary["led_enabled"] is True
     assert snapshot.binary["tailscale_connected"] is True
+    assert "led" in snapshot.capabilities
     client = snapshot.clients["11:22:33:44:55:66"]
     assert client.name == "private-phone"
     assert client.ip_address == "192.168.8.20"

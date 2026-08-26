@@ -110,6 +110,10 @@ class GLiNetCoordinator(DataUpdateCoordinator[RouterSnapshot]):
         await self.client.async_set_adguard(key, enabled)
         await self.async_request_refresh()
 
+    async def async_set_led(self, enabled: bool) -> None:
+        await self.client.async_set_led(enabled)
+        await self.async_request_refresh()
+
     async def async_reboot_router(self) -> None:
         """Request a router reboot without immediately polling the rebooting device."""
         await self.client.async_reboot_router()
