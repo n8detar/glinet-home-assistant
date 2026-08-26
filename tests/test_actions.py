@@ -66,6 +66,54 @@ async def test_set_internet_priority_refuses_load_balancing() -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_led_writes_minimum_payload_and_verifies_state() -> None:
+    session = FakeSession(
+        [
+            {"result": {"led_enable": False}},
+            {"result": []},
+            {"result": {"led_enable": True}},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_set_led(True)
+
+    calls = [request["json"]["params"][1:] for request in session.requests]
+    assert calls == [
+        ["led", "get_config", {}],
+        ["led", "set_config", {"led_enable": True}],
+        ["led", "get_config", {}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_set_led_raises_when_readback_does_not_match() -> None:
+    session = FakeSession(
+        [
+            {"result": {"led_enable": True}},
+            {"result": []},
+            {"result": {"led_enable": True}},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    with pytest.raises(GLiNetRpcError, match="did not apply LED state"):
+        await client.async_set_led(False)
+
+
+@pytest.mark.asyncio
 async def test_send_sms_uses_minimum_verified_payload() -> None:
     session = FakeSession([{"result": []}])
     client = GLiNetApiClient(

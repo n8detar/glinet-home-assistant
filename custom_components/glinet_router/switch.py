@@ -26,6 +26,14 @@ class GLiNetSwitchDescription(SwitchEntityDescription):
 
 SWITCHES: tuple[GLiNetSwitchDescription, ...] = (
     GLiNetSwitchDescription(
+        key="status_leds",
+        data_key="led_enabled",
+        control="led",
+        name="Status LEDs",
+        icon="mdi:led-on",
+        entity_category=EntityCategory.CONFIG,
+    ),
+    GLiNetSwitchDescription(
         key="adguard_enabled_control",
         data_key="adguard_enabled",
         setting="enabled",
@@ -115,6 +123,8 @@ class GLiNetControlSwitch(GLiNetEntity, SwitchEntity):
             await self.coordinator.async_set_tailscale(description.setting, enabled)
         elif description.control == "adguard" and description.setting:
             await self.coordinator.async_set_adguard(description.setting, enabled)
+        elif description.control == "led":
+            await self.coordinator.async_set_led(enabled)
         else:
             raise ValueError(f"Unsupported control: {description.control}")
 

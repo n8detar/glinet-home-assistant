@@ -51,13 +51,22 @@ def sample_snapshot() -> RouterSnapshot:
             "tailscale_enabled": False,
             "adguard_enabled": False,
             "adguard_dns_enabled": False,
+            "led_enabled": True,
         },
         device={
             "model": "x3000",
             "firmware": "4.8.3",
             "modem": "RM520N-GL",
         },
-        capabilities={"router", "multiwan", "modem", "sms", "tailscale", "adguard"},
+        capabilities={
+            "router",
+            "multiwan",
+            "modem",
+            "sms",
+            "tailscale",
+            "adguard",
+            "led",
+        },
     )
 
 
@@ -97,6 +106,7 @@ async def test_setup_creates_entities_and_service(
     assert hass.states.get("select.gl_x3000_internet_priority").state == (
         "Cellular before Ethernet"
     )
+    assert hass.states.get("switch.gl_x3000_status_leds").state == "on"
 
     registry = er.async_get(hass)
     for unique_id in (
@@ -115,6 +125,41 @@ async def test_setup_creates_entities_and_service(
     assert await hass.config_entries.async_unload(entry.entry_id)
     for service in ("send_sms", "mark_sms_read", "delete_sms"):
         assert not hass.services.has_service(DOMAIN, service)
+
+
+async def test_led_switch_routes_turn_off_and_refreshes(hass, monkeypatch) -> None:
+    get_snapshot = AsyncMock(return_value=sample_snapshot())
+    set_led = AsyncMock()
+    monkeypatch.setattr(GLiNetApiClient, "async_get_snapshot", get_snapshot)
+    monkeypatch.setattr(
+        GLiNetApiClient, "async_get_sms_messages", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(GLiNetApiClient, "async_set_led", set_led)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="GL-X3000",
+        unique_id="hashed-router-id",
+        data={
+            CONF_HOST: "router.test",
+            CONF_USERNAME: "root",
+            CONF_PASSWORD: "private-password",
+            CONF_USE_SSL: False,
+            CONF_VERIFY_SSL: False,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "switch",
+        "turn_off",
+        {"entity_id": "switch.gl_x3000_status_leds"},
+        blocking=True,
+    )
+
+    set_led.assert_awaited_once_with(False)
+    assert get_snapshot.await_count == 2
 
 
 async def test_sms_message_services_route_message_id(hass, monkeypatch) -> None:

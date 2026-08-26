@@ -381,6 +381,12 @@ def build_snapshot(responses: dict[str, Any]) -> RouterSnapshot:
     values["fan_rpm"] = _number(fan.get("speed"))
     binary["fan_running"] = bool(fan.get("status"))
 
+    led = _dict(responses.get("led_config"))
+    led_enabled = led.get("led_enable")
+    if isinstance(led_enabled, bool):
+        snapshot.capabilities.add("led")
+        binary["led_enabled"] = led_enabled
+
     kmwan_config = _dict(responses.get("kmwan_config"))
     if kmwan_config.get("interfaces"):
         snapshot.capabilities.add("multiwan")

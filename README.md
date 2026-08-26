@@ -16,6 +16,7 @@ A privacy-conscious Home Assistant custom integration for GL.iNet firmware 4.x r
 - UniFi-style, MAC-stable client device trackers with stale-client handling
 - Constrained Cellular/Ethernet 1 failover-priority control
 - Optional, disabled-by-default bounded controls
+- Capability-gated status-LED switch with write verification
 - SMS sending, inbox events, and bounded read/delete controls without retaining message contents in coordinator state or diagnostics
 - Companion GNSS setup through Home Assistant's built-in GPSD integration
 
@@ -140,7 +141,7 @@ Under **Settings → Devices & services → GL.iNet Router → Configure**, you 
 
 ## Controls
 
-All configuration switches are disabled by default in the entity registry.
+Network-service configuration switches are disabled by default in the entity registry. The reversible status-LED switch is enabled by default when its firmware capability is confirmed.
 
 ### Internet priority
 
@@ -155,6 +156,12 @@ Options:
 - **Cellular before Ethernet**
 
 The integration reads the current configuration, changes only the Ethernet 1 and Cellular positions, sends the complete five-interface ordering, reads it back, and verifies every metric. It does not switch load balancing to failover and does not rewrite unknown/custom orders.
+
+### Status LEDs
+
+The `Status LEDs` switch is created only when `led.get_config` returns a boolean `led_enable` value. Turning it on or off reads the current LED configuration, sends only the verified `led_enable` field, reads the configuration back, and reports an error if the router did not apply the requested state.
+
+Router-local LED schedules are not exposed. Use a Home Assistant automation with this switch when scheduled control is needed.
 
 ### Bounded service controls
 

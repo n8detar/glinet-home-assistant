@@ -219,6 +219,7 @@ class GLiNetApiClient:
         )
         optional_specs = (
             ("fan_status", "fan", "get_status"),
+            ("led_config", "led", "get_config"),
             ("kmwan_config", "kmwan", "get_config"),
             ("kmwan_status", "kmwan", "get_status"),
             ("kmwan_sensitivity", "kmwan", "get_sensitivity"),
@@ -299,6 +300,22 @@ class GLiNetApiClient:
             }
             if actual != payload:
                 raise GLiNetRpcError(None, "Router did not apply internet priority")
+
+    async def async_set_led(self, enabled: bool) -> None:
+        """Set and verify the status-indicator state."""
+        async with self._write_lock:
+            current = await self.async_call("led", "get_config")
+            if not isinstance(current, dict) or not isinstance(
+                current.get("led_enable"), bool
+            ):
+                raise GLiNetRpcError(None, "Malformed LED configuration")
+            await self.async_call("led", "set_config", {"led_enable": enabled})
+            verified = await self.async_call("led", "get_config")
+            if (
+                not isinstance(verified, dict)
+                or verified.get("led_enable") is not enabled
+            ):
+                raise GLiNetRpcError(None, "Router did not apply LED state")
 
     async def async_send_sms(
         self, *, bus: str, phone_number: str, message: str
