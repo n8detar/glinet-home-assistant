@@ -10,6 +10,31 @@ from custom_components.glinet_router.models import PRIORITY_ETHERNET_FIRST
 from tests.test_api_client import FakeSession
 
 
+def _wifi_config(
+    *,
+    enabled_2g: bool = True,
+    enabled_5g: bool = True,
+    tx_power_2g: str = "Max",
+    tx_power_5g: str = "Max",
+) -> dict[str, Any]:
+    return {
+        "res": [
+            {
+                "band": "2G",
+                "device": "radio-2g-test",
+                "txpower": tx_power_2g,
+                "ifaces": [{"name": "wifi2g", "enabled": enabled_2g}],
+            },
+            {
+                "band": "5G",
+                "device": "radio-5g-test",
+                "txpower": tx_power_5g,
+                "ifaces": [{"name": "wifi5g", "enabled": enabled_5g}],
+            },
+        ]
+    }
+
+
 @pytest.mark.asyncio
 async def test_set_internet_priority_writes_and_verifies_complete_order() -> None:
     initial = {
@@ -111,6 +136,99 @@ async def test_set_led_raises_when_readback_does_not_match() -> None:
 
     with pytest.raises(GLiNetRpcError, match="did not apply LED state"):
         await client.async_set_led(False)
+
+
+@pytest.mark.asyncio
+async def test_set_wifi_enabled_uses_iface_name_and_verifies_readback() -> None:
+    session = FakeSession(
+        [
+            {"result": _wifi_config(enabled_5g=True)},
+            {"result": []},
+            {"result": _wifi_config(enabled_5g=False)},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_set_wifi_enabled("5g", False)
+
+    calls = [request["json"]["params"][1:] for request in session.requests]
+    assert calls == [
+        ["wifi", "get_config", {}],
+        ["wifi", "set_config", {"iface_name": "wifi5g", "enabled": False}],
+        ["wifi", "get_config", {}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_set_wifi_enabled_raises_when_readback_does_not_match() -> None:
+    session = FakeSession(
+        [
+            {"result": _wifi_config(enabled_2g=True)},
+            {"result": []},
+            {"result": _wifi_config(enabled_2g=True)},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    with pytest.raises(GLiNetRpcError, match="did not apply 2g Wi-Fi state"):
+        await client.async_set_wifi_enabled("2g", False)
+
+
+@pytest.mark.asyncio
+async def test_set_wifi_tx_power_uses_discovered_device_and_verifies_readback() -> None:
+    session = FakeSession(
+        [
+            {"result": _wifi_config(tx_power_5g="Max")},
+            {"result": []},
+            {"result": _wifi_config(tx_power_5g="Low")},
+        ]
+    )
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=session,
+    )
+    client._sid = "test-sid"
+
+    await client.async_set_wifi_tx_power("5g", "Low")
+
+    calls = [request["json"]["params"][1:] for request in session.requests]
+    assert calls == [
+        ["wifi", "get_config", {}],
+        [
+            "wifi",
+            "set_txpower",
+            {"txpower": "Low", "device": "radio-5g-test"},
+        ],
+        ["wifi", "get_config", {}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_set_wifi_tx_power_rejects_unknown_option_before_device_io() -> None:
+    client = GLiNetApiClient(
+        endpoint="http://router.test/rpc",
+        username="root",
+        password="secret",
+        session=FakeSession([]),
+    )
+    client._sid = "test-sid"
+
+    with pytest.raises(ValueError, match="Unsupported Wi-Fi TX power"):
+        await client.async_set_wifi_tx_power("5g", "Automatic")
 
 
 @pytest.mark.asyncio

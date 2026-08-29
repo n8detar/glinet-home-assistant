@@ -11,6 +11,7 @@ from .const import MAX_SMS_MESSAGE_ID_LENGTH
 PRIORITY_ETHERNET_FIRST: Final = "Ethernet before cellular"
 PRIORITY_CELLULAR_FIRST: Final = "Cellular before Ethernet"
 PRIORITY_OPTIONS: Final = (PRIORITY_ETHERNET_FIRST, PRIORITY_CELLULAR_FIRST)
+WIFI_TX_POWER_OPTIONS: Final = ("Max", "High", "Medium", "Low")
 
 _ETHERNET_FIRST = ("wwan", "wan", "modem_0001", "tethering", "secondwan")
 _CELLULAR_FIRST = ("wwan", "modem_0001", "wan", "tethering", "secondwan")
@@ -55,6 +56,17 @@ class RouterClient:
     interface: str | None
     blocked: bool
     remote: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WifiRadio:
+    """Sanitized state required for one main Wi-Fi radio control."""
+
+    band: str
+    iface_name: str
+    enabled: bool
+    device: str | None
+    tx_power: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +180,40 @@ def _optional_string(value: Any) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def parse_wifi_radios(response: Any) -> dict[str, WifiRadio]:
+    """Normalize main-radio state without retaining SSIDs or network keys."""
+    radios: dict[str, WifiRadio] = {}
+    expected_ifaces = {"2G": "wifi2g", "5G": "wifi5g"}
+    for raw_radio in _list(_dict(response).get("res")):
+        radio = _dict(raw_radio)
+        band = radio.get("band")
+        if not isinstance(band, str):
+            continue
+        iface_name = expected_ifaces.get(band)
+        if iface_name is None:
+            continue
+        interface = next(
+            (
+                _dict(item)
+                for item in _list(radio.get("ifaces"))
+                if _dict(item).get("name") == iface_name
+            ),
+            {},
+        )
+        enabled = interface.get("enabled")
+        if not isinstance(enabled, bool):
+            continue
+        tx_power = radio.get("txpower")
+        radios[band.lower()] = WifiRadio(
+            band=band.lower(),
+            iface_name=iface_name,
+            enabled=enabled,
+            device=_optional_string(radio.get("device")),
+            tx_power=(tx_power if tx_power in WIFI_TX_POWER_OPTIONS else None),
+        )
+    return radios
 
 
 def _sms_message_id(value: Any) -> str | None:
@@ -386,6 +432,14 @@ def build_snapshot(responses: dict[str, Any]) -> RouterSnapshot:
     if isinstance(led_enabled, bool):
         snapshot.capabilities.add("led")
         binary["led_enabled"] = led_enabled
+
+    for band, radio in parse_wifi_radios(responses.get("wifi_config")).items():
+        control_key = f"wifi_{band}_control"
+        binary[f"wifi_{band}_enabled"] = radio.enabled
+        snapshot.capabilities.add(control_key)
+        if radio.device is not None and radio.tx_power is not None:
+            values[f"wifi_{band}_tx_power"] = radio.tx_power
+            snapshot.capabilities.add(f"wifi_{band}_tx_power")
 
     kmwan_config = _dict(responses.get("kmwan_config"))
     if kmwan_config.get("interfaces"):

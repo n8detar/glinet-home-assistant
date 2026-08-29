@@ -173,6 +173,7 @@ async def test_get_snapshot_discovers_modem_bus_and_sanitizes(
     snapshot = await client.async_get_snapshot()
 
     assert ("modem", "get_cells_info", {"bus": "0001:01:00.0"}) in calls
+    assert ("wifi", "get_config", {}) in calls
     assert ("clients", "get_list", {}) in calls
     assert snapshot.device["modem"] == "RM520N-GL"
     assert "private-imei" not in repr(snapshot)
