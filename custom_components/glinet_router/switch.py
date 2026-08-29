@@ -34,6 +34,26 @@ SWITCHES: tuple[GLiNetSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
     ),
     GLiNetSwitchDescription(
+        key="wifi_2g_enabled_control",
+        data_key="wifi_2g_enabled",
+        setting="2g",
+        control="wifi_2g_control",
+        name="2.4 GHz Wi-Fi",
+        icon="mdi:wifi",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
+    GLiNetSwitchDescription(
+        key="wifi_5g_enabled_control",
+        data_key="wifi_5g_enabled",
+        setting="5g",
+        control="wifi_5g_control",
+        name="5 GHz Wi-Fi",
+        icon="mdi:wifi",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
+    GLiNetSwitchDescription(
         key="adguard_enabled_control",
         data_key="adguard_enabled",
         setting="enabled",
@@ -125,6 +145,8 @@ class GLiNetControlSwitch(GLiNetEntity, SwitchEntity):
             await self.coordinator.async_set_adguard(description.setting, enabled)
         elif description.control == "led":
             await self.coordinator.async_set_led(enabled)
+        elif description.control.startswith("wifi_") and description.setting:
+            await self.coordinator.async_set_wifi_enabled(description.setting, enabled)
         else:
             raise ValueError(f"Unsupported control: {description.control}")
 

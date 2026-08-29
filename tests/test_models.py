@@ -32,6 +32,38 @@ def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> N
         },
         "fan_status": {"speed": 1200, "status": True},
         "led_config": {"led_enable": True},
+        "wifi_config": {
+            "res": [
+                {
+                    "band": "2G",
+                    "device": "mt798111",
+                    "txpower": "High",
+                    "ifaces": [
+                        {
+                            "name": "wifi2g",
+                            "guest": False,
+                            "enabled": True,
+                            "ssid": "private-ssid-2g",
+                            "key": "private-wifi-key-2g",
+                        }
+                    ],
+                },
+                {
+                    "band": "5G",
+                    "device": "mt798112",
+                    "txpower": "Max",
+                    "ifaces": [
+                        {
+                            "name": "wifi5g",
+                            "guest": False,
+                            "enabled": False,
+                            "ssid": "private-ssid-5g",
+                            "key": "private-wifi-key-5g",
+                        }
+                    ],
+                },
+            ]
+        },
         "kmwan_config": {
             "mode": 0,
             "interfaces": [
@@ -141,8 +173,18 @@ def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> N
     assert snapshot.binary["ethernet_1_healthy"] is False
     assert snapshot.binary["cellular_connected"] is True
     assert snapshot.binary["led_enabled"] is True
+    assert snapshot.binary["wifi_2g_enabled"] is True
+    assert snapshot.binary["wifi_5g_enabled"] is False
     assert snapshot.binary["tailscale_connected"] is True
     assert "led" in snapshot.capabilities
+    assert snapshot.values["wifi_2g_tx_power"] == "High"
+    assert snapshot.values["wifi_5g_tx_power"] == "Max"
+    assert {
+        "wifi_2g_control",
+        "wifi_5g_control",
+        "wifi_2g_tx_power",
+        "wifi_5g_tx_power",
+    } <= snapshot.capabilities
     client = snapshot.clients["11:22:33:44:55:66"]
     assert client.name == "private-phone"
     assert client.ip_address == "192.168.8.20"
@@ -160,6 +202,10 @@ def test_build_snapshot_normalizes_clients_while_excluding_router_secrets() -> N
         "private@example.com",
         "100.64.0.1",
         "private-rule",
+        "private-ssid-2g",
+        "private-wifi-key-2g",
+        "private-ssid-5g",
+        "private-wifi-key-5g",
     ):
         assert private_value not in serialized
 

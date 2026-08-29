@@ -39,6 +39,8 @@ def sample_snapshot() -> RouterSnapshot:
             "internet_priority": "Cellular before Ethernet",
             "modem_bus": "0001:01:00.0",
             "cellular_rsrp": -100,
+            "wifi_2g_tx_power": "High",
+            "wifi_5g_tx_power": "Max",
         },
         binary={
             "internet_connected": True,
@@ -52,6 +54,8 @@ def sample_snapshot() -> RouterSnapshot:
             "adguard_enabled": False,
             "adguard_dns_enabled": False,
             "led_enabled": True,
+            "wifi_2g_enabled": True,
+            "wifi_5g_enabled": False,
         },
         device={
             "model": "x3000",
@@ -66,6 +70,10 @@ def sample_snapshot() -> RouterSnapshot:
             "tailscale",
             "adguard",
             "led",
+            "wifi_2g_control",
+            "wifi_5g_control",
+            "wifi_2g_tx_power",
+            "wifi_5g_tx_power",
         },
     )
 
@@ -114,8 +122,17 @@ async def test_setup_creates_entities_and_service(
         "hashed-router-id_reconnect_cellular",
         "hashed-router-id_mark_all_sms_read",
         "hashed-router-id_delete_all_read_sms",
+        "hashed-router-id_wifi_2g_enabled_control",
+        "hashed-router-id_wifi_5g_enabled_control",
+        "hashed-router-id_wifi_2g_tx_power",
+        "hashed-router-id_wifi_5g_tx_power",
     ):
-        entity_id = registry.async_get_entity_id("button", DOMAIN, unique_id)
+        platform = (
+            "select"
+            if "tx_power" in unique_id
+            else ("switch" if "wifi_" in unique_id else "button")
+        )
+        entity_id = registry.async_get_entity_id(platform, DOMAIN, unique_id)
         assert entity_id is not None
         assert (
             registry.async_get(entity_id).disabled_by
@@ -160,6 +177,61 @@ async def test_led_switch_routes_turn_off_and_refreshes(hass, monkeypatch) -> No
 
     set_led.assert_awaited_once_with(False)
     assert get_snapshot.await_count == 2
+
+
+async def test_wifi_controls_route_actions_and_refresh(hass, monkeypatch) -> None:
+    get_snapshot = AsyncMock(return_value=sample_snapshot())
+    set_enabled = AsyncMock()
+    set_tx_power = AsyncMock()
+    monkeypatch.setattr(GLiNetApiClient, "async_get_snapshot", get_snapshot)
+    monkeypatch.setattr(
+        GLiNetApiClient, "async_get_sms_messages", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(GLiNetApiClient, "async_set_wifi_enabled", set_enabled)
+    monkeypatch.setattr(GLiNetApiClient, "async_set_wifi_tx_power", set_tx_power)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="GL-X3000",
+        unique_id="hashed-router-id",
+        data={
+            CONF_HOST: "router.test",
+            CONF_USERNAME: "root",
+            CONF_PASSWORD: "private-password",
+            CONF_USE_SSL: False,
+            CONF_VERIFY_SSL: False,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    switch_id = registry.async_get_entity_id(
+        "switch", DOMAIN, "hashed-router-id_wifi_5g_enabled_control"
+    )
+    select_id = registry.async_get_entity_id(
+        "select", DOMAIN, "hashed-router-id_wifi_5g_tx_power"
+    )
+    assert switch_id is not None
+    assert select_id is not None
+    registry.async_update_entity(switch_id, disabled_by=None)
+    registry.async_update_entity(select_id, disabled_by=None)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": switch_id}, blocking=True
+    )
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": select_id, "option": "Low"},
+        blocking=True,
+    )
+
+    set_enabled.assert_awaited_once_with("5g", False)
+    set_tx_power.assert_awaited_once_with("5g", "Low")
+    assert get_snapshot.await_count == 3
 
 
 async def test_sms_message_services_route_message_id(hass, monkeypatch) -> None:

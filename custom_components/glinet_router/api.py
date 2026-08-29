@@ -9,11 +9,14 @@ from typing import Any, Final, Protocol
 from passlib.hash import md5_crypt, sha256_crypt, sha512_crypt
 
 from .models import (
+    WIFI_TX_POWER_OPTIONS,
     RouterSnapshot,
     SmsMessage,
+    WifiRadio,
     build_failover_payload,
     build_snapshot,
     parse_sms_messages,
+    parse_wifi_radios,
 )
 
 _SUPPORTED_HASHES: Final = {"md5", "sha256", "sha512"}
@@ -220,6 +223,7 @@ class GLiNetApiClient:
         optional_specs = (
             ("fan_status", "fan", "get_status"),
             ("led_config", "led", "get_config"),
+            ("wifi_config", "wifi", "get_config"),
             ("kmwan_config", "kmwan", "get_config"),
             ("kmwan_status", "kmwan", "get_status"),
             ("kmwan_sensitivity", "kmwan", "get_sensitivity"),
@@ -316,6 +320,58 @@ class GLiNetApiClient:
                 or verified.get("led_enable") is not enabled
             ):
                 raise GLiNetRpcError(None, "Router did not apply LED state")
+
+    @staticmethod
+    def _wifi_radio(response: Any, band: str) -> WifiRadio:
+        """Return one validated radio from a complete Wi-Fi configuration."""
+        if band not in {"2g", "5g"}:
+            raise ValueError(f"Unsupported Wi-Fi band: {band}")
+        if not isinstance(response, dict) or not isinstance(response.get("res"), list):
+            raise GLiNetRpcError(None, "Malformed Wi-Fi configuration")
+        radio = parse_wifi_radios(response).get(band)
+        if radio is None:
+            raise GLiNetRpcError(None, f"Missing {band} Wi-Fi configuration")
+        return radio
+
+    async def async_set_wifi_enabled(self, band: str, enabled: bool) -> None:
+        """Set and verify one main Wi-Fi interface's enabled state."""
+        async with self._write_lock:
+            current = self._wifi_radio(
+                await self.async_call("wifi", "get_config"), band
+            )
+            await self.async_call(
+                "wifi",
+                "set_config",
+                {"iface_name": current.iface_name, "enabled": enabled},
+            )
+            verified = self._wifi_radio(
+                await self.async_call("wifi", "get_config"), band
+            )
+            if verified.enabled is not enabled:
+                raise GLiNetRpcError(None, f"Router did not apply {band} Wi-Fi state")
+
+    async def async_set_wifi_tx_power(self, band: str, option: str) -> None:
+        """Set and verify one radio's constrained transmit-power level."""
+        if option not in WIFI_TX_POWER_OPTIONS:
+            raise ValueError(f"Unsupported Wi-Fi TX power: {option}")
+        async with self._write_lock:
+            current = self._wifi_radio(
+                await self.async_call("wifi", "get_config"), band
+            )
+            if current.device is None or current.tx_power is None:
+                raise GLiNetRpcError(None, f"Malformed {band} Wi-Fi TX power")
+            await self.async_call(
+                "wifi",
+                "set_txpower",
+                {"txpower": option, "device": current.device},
+            )
+            verified = self._wifi_radio(
+                await self.async_call("wifi", "get_config"), band
+            )
+            if verified.tx_power != option:
+                raise GLiNetRpcError(
+                    None, f"Router did not apply {band} Wi-Fi TX power"
+                )
 
     async def async_send_sms(
         self, *, bus: str, phone_number: str, message: str

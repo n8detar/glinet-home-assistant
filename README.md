@@ -141,7 +141,7 @@ Under **Settings → Devices & services → GL.iNet Router → Configure**, you 
 
 ## Controls
 
-Network-service configuration switches are disabled by default in the entity registry. The reversible status-LED switch is enabled by default when its firmware capability is confirmed.
+Network-service and Wi-Fi controls are disabled by default in the entity registry because they can disrupt connectivity. The reversible status-LED switch is enabled by default when its firmware capability is confirmed.
 
 ### Internet priority
 
@@ -162,6 +162,19 @@ The integration reads the current configuration, changes only the Ethernet 1 and
 The `Status LEDs` switch is created only when `led.get_config` returns a boolean `led_enable` value. Turning it on or off reads the current LED configuration, sends only the verified `led_enable` field, reads the configuration back, and reports an error if the router did not apply the requested state.
 
 Router-local LED schedules are not exposed. Use a Home Assistant automation with this switch when scheduled control is needed.
+
+### Wi-Fi radios and transmit power
+
+Capability-gated controls are available independently for the main 2.4 GHz and 5 GHz Wi-Fi interfaces:
+
+- an enable/disable switch for each band; and
+- a TX-power select with the firmware-confirmed options `Max`, `High`, `Medium`, and `Low`.
+
+The integration polls `wifi.get_config`, immediately reduces the response to the band, interface state, radio device name, and recognized TX-power level, and does not retain SSIDs or Wi-Fi keys. A switch is created only when its expected main interface has a boolean state. A TX-power select is created only when the radio also reports a device name and one of the recognized options.
+
+Every write is serialized as one read/write/readback transaction. Interface switches send only `iface_name` and `enabled`; TX-power selects use the device name discovered from the immediately preceding configuration read. A readback mismatch is reported as an error.
+
+These four entities are disabled by default. Disabling the radio carrying Home Assistant's connection to the router can interrupt readback and prevent Home Assistant from turning it back on. Enable and use these controls only when Home Assistant has another reliable path to the router, such as Ethernet or the other Wi-Fi band.
 
 ### Bounded service controls
 
